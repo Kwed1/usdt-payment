@@ -22,6 +22,21 @@ export interface ITransactionData {
   total_played: number;
 }
 
+export interface GeneratePayloadResponse {
+  payload: string;
+}
+
+export interface ConnectWalletRequestBody {
+  address: string;
+  public_key: string | undefined;
+  proof: object;
+}
+
+export interface ConnectWalletResponse {
+  success: boolean;
+  message?: string;
+}
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://vowwin-api.webdevops.online'
 
 const apiClient = axios.create({
@@ -36,10 +51,29 @@ export const useWalletService = () => {
     const createTransaction = async (
       amount: number
     ): Promise<ITransactionResponse> => {
-      const res = await apiClient.post<ITransactionResponse>('/transaction/', { amount })
+      const res = await apiClient.post<ITransactionResponse>('/create-deposit-message', { amount })
       return res.data || { address: "", memo: "" }
     }
 
-    return { createTransaction }
+    const generatePayload = async (): Promise<GeneratePayloadResponse> => {
+      const res = await apiClient.post<GeneratePayloadResponse>('/generate-payload')
+      return res.data
+    }
+
+    const connectWallet = async (data: ConnectWalletRequestBody): Promise<ConnectWalletResponse> => {
+      const res = await apiClient.post<ConnectWalletResponse>('/check-proof', data)
+      return res.data
+    }
+
+    const disconnectWallet = async (): Promise<void> => {
+      await apiClient.post('/wallet/disconnect')
+    }
+
+    return { 
+      createTransaction,
+      generatePayload,
+      connectWallet,
+      disconnectWallet
+    }
   }, [])
 }

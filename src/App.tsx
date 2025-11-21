@@ -5,6 +5,7 @@ import { TonClientContext } from './components/context/ton-client-context'
 import { ErrorSection } from './components/ErrorSection'
 import { FormSection } from './components/FormSection'
 import { useTonConnect } from './components/hooks/useTonConnect'
+import { useTonWalletConnection } from './components/hooks/useTonWalletConnection'
 import { OwnerSelector } from './components/OwnerSelector'
 import { PackagesSection } from './components/PackagesSection'
 import { SuccessSection } from './components/SuccessSection'
@@ -94,9 +95,10 @@ function App({
 	>(null)
 	const [ownerStats, setOwnerStats] = useState<OwnerStats | null>(null)
 	const [ownerStatsLoading, setOwnerStatsLoading] = useState(false)
-	const { sender, walletAddress, connected, tonConnectUI } = useTonConnect()
+	const { sender, walletAddress, connected } = useTonConnect()
 	const { tonClient } = useContext(TonClientContext)
 	const { createTransaction } = useWalletService()
+	const { onConnectWallet } = useTonWalletConnection()
 	// Initialize from storage
 	useEffect(() => {
 		if (!accountLocked && !accountShortId) {
@@ -491,7 +493,7 @@ function App({
 					isLoading={isLoading}
 					isActive={currentStep === 'packages'}
 					walletConnected={connected}
-					tonConnectUI={tonConnectUI}
+					onConnectWallet={onConnectWallet}
 				/>
 
 				{preview?.sale && (

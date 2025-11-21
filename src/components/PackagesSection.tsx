@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import type { Sale } from '../types';
-import type { TonConnectUI } from '@tonconnect/ui';
 
 interface PackagesSectionProps {
   sale: Sale | null;
@@ -9,7 +8,7 @@ interface PackagesSectionProps {
   isLoading: boolean;
   isActive: boolean;
   walletConnected: boolean;
-  tonConnectUI: TonConnectUI | null;
+  onConnectWallet: () => Promise<void>;
 }
 
 function formatNumber(value: number, fractionDigits = 0): string {
@@ -26,7 +25,7 @@ export const PackagesSection: React.FC<PackagesSectionProps> = ({
   isLoading,
   isActive,
   walletConnected,
-  tonConnectUI,
+  onConnectWallet,
 }) => {
   const [customAmount, setCustomAmount] = useState('');
   const [selectedPackage, setSelectedPackage] = useState<number | null>(null);
@@ -38,12 +37,10 @@ export const PackagesSection: React.FC<PackagesSectionProps> = ({
   const pricePerChip = Number(sale.price_per_chip);
 
   const handleConnectWallet = async () => {
-    if (tonConnectUI) {
-      try {
-        await tonConnectUI.openModal();
-      } catch (error) {
-        console.error('Failed to open wallet connection modal:', error);
-      }
+    try {
+      await onConnectWallet();
+    } catch (error) {
+      console.error('Failed to connect wallet:', error);
     }
   };
 
