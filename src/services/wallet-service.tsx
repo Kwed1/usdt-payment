@@ -1,5 +1,6 @@
-import axios from "axios"
-import { useMemo } from "react"
+import axios from "axios";
+import { useMemo } from "react";
+import { API_BASE_URL } from "../config/api.config";
 
 export interface ITransactionResponse {
   address: string;
@@ -37,7 +38,20 @@ export interface ConnectWalletResponse {
   message?: string;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://vowwin-api.webdevops.online'
+export interface ClubBalanceResponse {
+  balance: number;
+}
+
+export interface WithdrawRequest {
+  user_id: string;
+  amount: number;
+  club_short_id: string;
+}
+
+export interface WithdrawResponse {
+  success: boolean;
+  message?: string;
+}
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -69,11 +83,23 @@ export const useWalletService = () => {
       await apiClient.post('/wallet/disconnect')
     }
 
+    const getClubBalance = async (clubShortId: string): Promise<number> => {
+      const res = await apiClient.get<ClubBalanceResponse>(`/club/${clubShortId}/balance`)
+      return res.data.balance || 0
+    }
+
+    const withdraw = async (data: WithdrawRequest): Promise<WithdrawResponse> => {
+      const res = await apiClient.post<WithdrawResponse>('/withdraw', data)
+      return res.data
+    }
+
     return { 
       createTransaction,
       generatePayload,
       connectWallet,
-      disconnectWallet
+      disconnectWallet,
+      getClubBalance,
+      withdraw
     }
   }, [])
 }

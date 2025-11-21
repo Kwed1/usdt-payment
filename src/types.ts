@@ -50,6 +50,6 @@ export interface OwnerStats {
   payments?: Payment[];
 }
 
-export type Step = 'form' | 'error' | 'packages' | 'summary' | 'success';
+export type Step = 'form' | 'error' | 'packages' | 'summary' | 'success' | 'withdraw';
 
 

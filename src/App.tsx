@@ -10,6 +10,8 @@ import { OwnerSelector } from './components/OwnerSelector'
 import { PackagesSection } from './components/PackagesSection'
 import { SuccessSection } from './components/SuccessSection'
 import { SummarySection } from './components/SummarySection'
+import { WithdrawSection } from './components/WithdrawSection'
+import { getApiUrl } from './config/api.config'
 import { USDT_MASTER_ADDRESS } from './constants/common-constants'
 import { JETTON_TRANSFER_GAS_FEES } from './constants/fees.constants'
 import { calculateUsdtAmount } from './helpers/common-helpers'
@@ -66,6 +68,8 @@ function App({
 	cdnUrl = 'https://ppnards.ams3.cdn.digitaloceanspaces.com',
 	authData = '',
 }: AppProps) {
+	const isAdmin = true // Временная переменная для админа
+	
 	const [currentStep, setCurrentStep] = useState<Step>('form')
 	const [accountShortId, setAccountShortId] = useState(initialAccount)
 	const [clubShortId, setClubShortId] = useState(initialClub)
@@ -97,7 +101,7 @@ function App({
 	const [ownerStatsLoading, setOwnerStatsLoading] = useState(false)
 	const { sender, walletAddress, connected } = useTonConnect()
 	const { tonClient } = useContext(TonClientContext)
-	const { createTransaction } = useWalletService()
+	const { createTransaction, getClubBalance, withdraw } = useWalletService()
 	const { onConnectWallet } = useTonWalletConnection()
 	// Initialize from storage
 	useEffect(() => {
@@ -131,7 +135,7 @@ function App({
 				club_short_id: String(club),
 			})
 			const response = await fetch(
-				`/tg-club-chip-sales/preview?${query.toString()}`,
+				`${getApiUrl('tg-club-chip-sales/preview')}?${query.toString()}`,
 				{
 					headers: {
 						Accept: 'application/json',
@@ -322,7 +326,7 @@ function App({
 		}
 
 		try {
-			const response = await fetch('/tg-club-chip-sales/owner-clubs', {
+			const response = await fetch(getApiUrl('tg-club-chip-sales/owner-clubs'), {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
@@ -382,7 +386,7 @@ function App({
 			setOwnerStats(null)
 
 			try {
-				const response = await fetch('/tg-club-chip-sales/owner-insights', {
+				const response = await fetch(getApiUrl('tg-club-chip-sales/owner-insights'), {
 					method: 'POST',
 					headers: {
 						'Content-Type': 'application/json',
@@ -443,6 +447,22 @@ function App({
 		}
 	}, [authData, loadOwnerClubs])
 
+	const handleWithdraw = useCallback(async (userId: string, amount: number) => {
+		if (!clubShortId) {
+			throw new Error('ID клуба не указан')
+		}
+		
+		const response = await withdraw({
+			user_id: userId,
+			amount: amount,
+			club_short_id: clubShortId,
+		})
+
+		if (!response.success) {
+			throw new Error(response.message || 'Ошибка при выводе средств')
+		}
+	}, [clubShortId, withdraw])
+
 	return (
 		<div className='app'>
 			<header>
@@ -478,6 +498,67 @@ function App({
 					cdnUrl={cdnUrl}
 					isActive={currentStep === 'form'}
 				/>
+
+				{isAdmin && preview && preview.allowed && (
+					<div style={{ 
+						marginTop: '20px', 
+						marginBottom: '20px',
+						display: 'flex', 
+						gap: '10px',
+						justifyContent: 'center'
+					}}>
+						<button
+							type="button"
+							onClick={() => setCurrentStep('packages')}
+							style={{
+								padding: '12px 24px',
+								backgroundColor: currentStep === 'packages' || currentStep === 'summary' ? '#4CAF50' : '#2196F3',
+								color: 'white',
+								border: 'none',
+								borderRadius: '8px',
+								cursor: 'pointer',
+								fontSize: '1rem',
+								fontWeight: '500',
+								transition: 'background-color 0.2s',
+							}}
+							onMouseOver={(e) => {
+								if (currentStep !== 'packages' && currentStep !== 'summary') {
+									e.currentTarget.style.backgroundColor = '#1976D2'
+								}
+							}}
+							onMouseOut={(e) => {
+								if (currentStep !== 'packages' && currentStep !== 'summary') {
+									e.currentTarget.style.backgroundColor = '#2196F3'
+								}
+							}}
+						>
+							Депозит
+						</button>
+						<button
+							type="button"
+							onClick={() => setCurrentStep('withdraw')}
+							style={{
+								padding: '12px 24px',
+								backgroundColor: '#FF9800',
+								color: 'white',
+								border: 'none',
+								borderRadius: '8px',
+								cursor: 'pointer',
+								fontSize: '1rem',
+								fontWeight: '500',
+								transition: 'background-color 0.2s',
+							}}
+							onMouseOver={(e) => {
+								e.currentTarget.style.backgroundColor = '#F57C00'
+							}}
+							onMouseOut={(e) => {
+								e.currentTarget.style.backgroundColor = '#FF9800'
+							}}
+						>
+							Вывод
+						</button>
+					</div>
+				)}
 
 				<ErrorSection
 					message={errorMessage}
@@ -516,6 +597,16 @@ function App({
 					onClose={handleSuccessClose}
 					isActive={currentStep === 'success'}
 				/>
+
+				{isAdmin && (
+					<WithdrawSection
+						clubShortId={clubShortId || ''}
+						onWithdraw={handleWithdraw}
+						getClubBalance={getClubBalance}
+						isActive={currentStep === 'withdraw'}
+						isLoading={isLoading}
+					/>
+				)}
 			</main>
 		</div>
 	)
