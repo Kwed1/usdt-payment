@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { Sale } from '../types';
+import type { TonConnectUI } from '@tonconnect/ui';
 
 interface PackagesSectionProps {
   sale: Sale | null;
@@ -7,6 +8,8 @@ interface PackagesSectionProps {
   onAmountSelect: (amount: string) => void;
   isLoading: boolean;
   isActive: boolean;
+  walletConnected: boolean;
+  tonConnectUI: TonConnectUI | null;
 }
 
 function formatNumber(value: number, fractionDigits = 0): string {
@@ -22,6 +25,8 @@ export const PackagesSection: React.FC<PackagesSectionProps> = ({
   onAmountSelect,
   isLoading,
   isActive,
+  walletConnected,
+  tonConnectUI,
 }) => {
   const [customAmount, setCustomAmount] = useState('');
   const [selectedPackage, setSelectedPackage] = useState<number | null>(null);
@@ -32,12 +37,31 @@ export const PackagesSection: React.FC<PackagesSectionProps> = ({
 
   const pricePerChip = Number(sale.price_per_chip);
 
+  const handleConnectWallet = async () => {
+    if (tonConnectUI) {
+      try {
+        await tonConnectUI.openModal();
+      } catch (error) {
+        console.error('Failed to open wallet connection modal:', error);
+      }
+    }
+  };
+
   const handlePackageClick = (amount: number) => {
+    if (!walletConnected) {
+      handleConnectWallet();
+      return;
+    }
     setSelectedPackage(amount);
     onAmountSelect(String(amount));
   };
 
   const handleCustomAmount = () => {
+    if (!walletConnected) {
+      handleConnectWallet();
+      return;
+    }
+
     const value = Number(customAmount);
     if (!customAmount || isNaN(value) || value <= 0 || !Number.isInteger(value)) {
       return;
@@ -92,7 +116,7 @@ export const PackagesSection: React.FC<PackagesSectionProps> = ({
         <div id="packages-list" className="packages">
           {sale.quick_packages.map((amountValue) => {
             const amount = Number(amountValue);
-            const price = Math.round(amount * pricePerChip);
+            const price = amount * pricePerChip;
             return (
               <div
                 key={amount}
@@ -104,8 +128,8 @@ export const PackagesSection: React.FC<PackagesSectionProps> = ({
                   {formatNumber(amount, 0)}
                 </span>
                 <span className="price">
-                  <img src="https://ppnards.ams3.cdn.digitaloceanspaces.com/ppnards/leaderboards/type_params/tg_star.png" alt="XTR" className="xtr-icon" />
-                  {formatNumber(price, 0)}
+                  <img src="https://ppnards.ams3.cdn.digitaloceanspaces.com/ppnards/leaderboards/type_params/tg_star.png" alt="USDT" className="xtr-icon" />
+                  {formatNumber(price, 2)} USDT
                 </span>
               </div>
             );
@@ -125,7 +149,7 @@ export const PackagesSection: React.FC<PackagesSectionProps> = ({
                 onChange={(e) => setCustomAmount(e.target.value)}
               />
               <button type="button" id="custom-amount-button" onClick={handleCustomAmount}>
-                Добавить
+                {walletConnected ? 'Добавить' : 'Подключить кошелек'}
               </button>
             </div>
             {customRangeParts.length > 0 && (

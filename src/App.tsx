@@ -94,7 +94,7 @@ function App({
 	>(null)
 	const [ownerStats, setOwnerStats] = useState<OwnerStats | null>(null)
 	const [ownerStatsLoading, setOwnerStatsLoading] = useState(false)
-	const { sender, walletAddress } = useTonConnect()
+	const { sender, walletAddress, connected, tonConnectUI } = useTonConnect()
 	const { tonClient } = useContext(TonClientContext)
 	const { createTransaction } = useWalletService()
 	// Initialize from storage
@@ -153,6 +153,47 @@ function App({
 				return
 			}
 
+			// ВРЕМЕННО: пропускаем авторизацию
+			setIsLoading(true)
+			try {
+				// Создаем моковые данные для пропуска проверки
+				// 100 фишек = 1 USDT, значит 1 фишка = 0.01 USDT
+				const mockPreviewData: Preview = {
+					allowed: true,
+					club: {
+						title: `Клуб ${club}`,
+						short_id: club,
+					},
+					sale: {
+						price_per_chip: 0.01, // 1 USDT / 100 фишек
+						quick_packages: [100, 500, 1000, 5000],
+						allow_custom_amount: true,
+						min_custom_amount: 1,
+						max_custom_amount: 100000,
+					},
+					member_balance: 0,
+				}
+
+				setAccountShortId(account)
+				setClubShortId(club)
+				setPreview(mockPreviewData)
+				setClubInfo(mockPreviewData.club || null)
+				setClubMessage(mockPreviewData.sale?.custom_message || '')
+
+				persistInputs()
+				setCurrentStep('packages')
+			} catch (error) {
+				setErrorMessage(
+					(error as Error).message || 'Не удалось получить данные.'
+				)
+				setErrorContacts([])
+				setCurrentStep('error')
+			} finally {
+				setIsLoading(false)
+			}
+
+			// Оригинальный код (закомментирован для временного пропуска авторизации):
+			/*
 			setIsLoading(true)
 			try {
 				const previewData = await fetchPreview(account, club)
@@ -182,8 +223,9 @@ function App({
 			} finally {
 				setIsLoading(false)
 			}
+			*/
 		},
-		[accountShortId, clubShortId, clubLocked, fetchPreview, persistInputs]
+		[accountShortId, clubShortId, clubLocked, persistInputs]
 	)
 
 	const handleAmountSelect = useCallback((amount: string) => {
@@ -195,55 +237,73 @@ function App({
 		setCurrentStep('packages')
 	}, [])
 
+	const sendPaymentRequest = useCallback(async (amount: number) => {
+		const comment = await createTransaction(100)
+		try {
+			if (!tonClient || !walletAddress || !comment) {
+				throw new Error('Не удалось инициализировать транзакцию. Проверьте подключение кошелька.')
+			}
+
+			const jettonMaster = tonClient.open(
+				JettonMaster.create(USDT_MASTER_ADDRESS)
+			)
+			const usersUsdtAddress = await jettonMaster.getWalletAddress(
+				walletAddress
+			)
+
+			const jettonWallet = tonClient.open(
+				JettonWallet.createFromAddress(usersUsdtAddress)
+			)
+
+			await jettonWallet.sendTransfer(sender, {
+				fwdAmount: 1n,
+				comment: comment.memo,
+				jettonAmount: calculateUsdtAmount(Number(amount) * 100),
+				toAddress: Address.parse(comment.address),
+				value: JETTON_TRANSFER_GAS_FEES,
+			})
+		} catch (error) {
+			console.error('Error during transaction:', error)
+			throw error
+		}
+	}, [tonClient, walletAddress, sender, createTransaction])
+
 	const handleSummaryConfirm = useCallback(async () => {
 		if (!selectedAmount) {
 			return
 		}
 
+		// Проверяем подключение кошелька
+		if (!connected || !walletAddress) {
+			setErrorMessage('Пожалуйста, подключите TON кошелек для оплаты.')
+			setErrorContacts([])
+			setCurrentStep('error')
+			return
+		}
+
 		setIsLoading(true)
 		try {
-			const response = await fetch('/tg-club-chip-sales/checkout', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					Accept: 'application/json',
-				},
-				body: JSON.stringify({
-					account_short_id: accountShortId,
-					club_short_id: clubShortId,
-					chips_amount: selectedAmount,
-					authData: authData,
-				}),
-			})
+			// Вызываем функцию оплаты через TON
+			const amount = Number(selectedAmount)
+			const usdtAmount = amount * 0.01 // 100 фишек = 1 USDT
+			
+			await sendPaymentRequest(usdtAmount)
 
-			if (!response.ok) {
-				throw new Error('Не удалось подготовить оплату. Попробуйте позже.')
-			}
-
-			const data = await response.json()
-			if (!data.success || !data.invoice_link) {
-				setErrorMessage(data.detail || 'Не удалось подготовить оплату.')
-				setErrorContacts([])
-				setCurrentStep('error')
-				return
-			}
-
-			// TON payment integration will be added by user
-			// For now, just show success message
+			// После успешной транзакции показываем сообщение об успехе
 			setSuccessMessage(
 				'Оплата принята. Фишки появятся на балансе в ближайшие секунды.'
 			)
 			setCurrentStep('success')
 		} catch (error) {
 			setErrorMessage(
-				(error as Error).message || 'Не удалось подготовить оплату.'
+				(error as Error).message || 'Не удалось выполнить оплату.'
 			)
 			setErrorContacts([])
 			setCurrentStep('error')
 		} finally {
 			setIsLoading(false)
 		}
-	}, [selectedAmount, accountShortId, clubShortId, authData])
+	}, [selectedAmount, connected, walletAddress, sendPaymentRequest])
 
 	const handleErrorRetry = useCallback(() => {
 		setCurrentStep('form')
@@ -381,42 +441,13 @@ function App({
 		}
 	}, [authData, loadOwnerClubs])
 
-	const sendPaymentRequest = async (amount: number) => {
-		const comment = await createTransaction(100)
-		try {
-			if (!tonClient || !walletAddress || !comment) return
-			console.log(123)
-
-			const jettonMaster = tonClient.open(
-				JettonMaster.create(USDT_MASTER_ADDRESS)
-			)
-			const usersUsdtAddress = await jettonMaster.getWalletAddress(
-				walletAddress
-			)
-
-			const jettonWallet = tonClient.open(
-				JettonWallet.createFromAddress(usersUsdtAddress)
-			)
-
-			await jettonWallet.sendTransfer(sender, {
-				fwdAmount: 1n,
-				comment: comment.memo,
-				jettonAmount: calculateUsdtAmount(Number(amount) * 100),
-				toAddress: Address.parse(comment.address),
-				value: JETTON_TRANSFER_GAS_FEES,
-			})
-		} catch (error) {
-			console.log('Error during transaction check:', error)
-		}
-	}
-
 	return (
 		<div className='app'>
 			<header>
 				<h1>Покупка фишек</h1>
 				<p>
 					Введите свой ID игрока и ID клуба, чтобы пополнить баланс фишек за
-					XTR.
+					USDT.
 				</p>
 			</header>
 			<main>
@@ -459,6 +490,8 @@ function App({
 					onAmountSelect={handleAmountSelect}
 					isLoading={isLoading}
 					isActive={currentStep === 'packages'}
+					walletConnected={connected}
+					tonConnectUI={tonConnectUI}
 				/>
 
 				{preview?.sale && (

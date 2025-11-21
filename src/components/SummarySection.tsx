@@ -46,7 +46,7 @@ export const SummarySection: React.FC<SummarySectionProps> = ({
   isActive,
 }) => {
   const amount = parseInt(selectedAmount || '0', 10);
-  const price = Math.round(amount * pricePerChip);
+  const price = amount * pricePerChip;
   const balanceAfter = memberBalance + amount;
 
   return (
@@ -89,13 +89,13 @@ export const SummarySection: React.FC<SummarySectionProps> = ({
             <span>
               <img
                 src="https://ppnards.ams3.cdn.digitaloceanspaces.com/ppnards/leaderboards/type_params/tg_star.png"
-                alt="XTR"
+                alt="USDT"
                 className="xtr-icon"
               />
               К оплате
             </span>
             <span id="summary-price" className="amount">
-              {formatNumber(price, 0)}
+              {formatNumber(price, 2)} USDT
             </span>
           </div>
           <div className="summary-row">
