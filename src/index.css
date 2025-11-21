@@ -1,0 +1,33 @@
+:root {
+  color-scheme: light dark;
+  --background: #0f172a;
+  --background-secondary: rgba(15, 23, 42, 0.85);
+  --surface: rgba(255, 255, 255, 0.08);
+  --surface-light: rgba(255, 255, 255, 0.16);
+  --accent: #38bdf8;
+  --accent-contrast: #0b1120;
+  --text-primary: #f8fafc;
+  --text-secondary: rgba(248, 250, 252, 0.72);
+  --error: #f87171;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: linear-gradient(135deg, #020617 0%, #0f172a 50%, #1e293b 100%);
+  min-height: 100vh;
+  color: var(--text-primary);
+  display: flex;
+  justify-content: center;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+#root {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
