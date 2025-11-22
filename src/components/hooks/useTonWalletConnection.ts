@@ -6,7 +6,7 @@ export const useTonWalletConnection = () => {
 	const wallet = useTonWallet()
 	const [tonConnectUI] = useTonConnectUI()
 	const { generatePayload, connectWallet, disconnectWallet } = useWalletService()
-	
+
 	const [isGeneratingPayload, setIsGeneratingPayload] = useState(false)
 	const [isConnecting, setIsConnecting] = useState(false)
 	const [connectionError, setConnectionError] = useState<string | null>(null)
@@ -17,14 +17,14 @@ export const useTonWalletConnection = () => {
 			setIsGeneratingPayload(true)
 			setConnectionError(null)
 			tonConnectUI.setConnectRequestParameters({ state: 'loading' })
-			
+
 			const response = await generatePayload()
-			
-			if (response?.payload) {
+
+			if (response) {
 				tonConnectUI.setConnectRequestParameters({
 					state: 'ready',
 					value: {
-						tonProof: response.payload,
+						tonProof: response,
 					},
 				})
 				tonConnectUI.openModal()
@@ -64,7 +64,7 @@ export const useTonWalletConnection = () => {
 				'proof' in wallet.connectItems.tonProof
 			) {
 				const proof = JSON.stringify(wallet.connectItems.tonProof.proof)
-				
+
 				// Предотвращаем повторную отправку того же proof
 				if (lastProofRef.current === proof) {
 					return
@@ -83,7 +83,7 @@ export const useTonWalletConnection = () => {
 					}
 
 					const response = await connectWallet(reqBody)
-					
+
 					if (response?.success !== true) {
 						await onDisconnectWallet()
 						setConnectionError('Не удалось подтвердить подключение кошелька')
@@ -105,9 +105,9 @@ export const useTonWalletConnection = () => {
 		}
 	}, [tonConnectUI, connectWallet, onDisconnectWallet])
 
-	return { 
-		wallet, 
-		onConnectWallet, 
+	return {
+		wallet,
+		onConnectWallet,
 		onDisconnectWallet,
 		isGeneratingPayload,
 		isConnecting,

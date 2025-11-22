@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react'
 
 interface WithdrawSectionProps {
   clubShortId: string;
   onWithdraw: (userId: string, amount: number) => Promise<void>;
-  getClubBalance: (clubShortId: string) => Promise<number>;
+  getClubBalance: () => Promise<number>;
   isActive: boolean;
   isLoading: boolean;
+  onError: (message: string) => void;
 }
 
 export const WithdrawSection: React.FC<WithdrawSectionProps> = ({
@@ -14,6 +15,7 @@ export const WithdrawSection: React.FC<WithdrawSectionProps> = ({
   getClubBalance,
   isActive,
   isLoading,
+  onError,
 }) => {
   const [userId, setUserId] = useState('');
   const [amount, setAmount] = useState('');
@@ -32,7 +34,7 @@ export const WithdrawSection: React.FC<WithdrawSectionProps> = ({
     setIsLoadingBalance(true);
     setError(null);
     try {
-      const balance = await getClubBalance(clubShortId);
+      const balance = await getClubBalance();
       setClubBalance(balance);
     } catch (err) {
       setError((err as Error).message || 'Не удалось загрузить баланс клуба');
@@ -72,7 +74,10 @@ export const WithdrawSection: React.FC<WithdrawSectionProps> = ({
       // Обновляем баланс после успешного вывода
       await loadClubBalance();
     } catch (err) {
-      setError((err as Error).message || 'Ошибка при выводе средств');
+      const errorMessage = (err as Error).message || 'Ошибка при выводе средств';
+      setError(errorMessage);
+      // Показываем ошибку через ErrorSection как при депозите
+      onError(errorMessage);
     }
   };
 
@@ -179,5 +184,6 @@ export const WithdrawSection: React.FC<WithdrawSectionProps> = ({
     </section>
   );
 };
+
 
 

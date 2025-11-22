@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react'
 
 interface WithdrawModalProps {
   isOpen: boolean;
   onClose: () => void;
   clubShortId: string;
   onWithdraw: (userId: string, amount: number) => Promise<void>;
-  getClubBalance: (clubShortId: string) => Promise<number>;
+  getClubBalance: () => Promise<number>;
 }
 
 export const WithdrawModal: React.FC<WithdrawModalProps> = ({
@@ -32,7 +32,7 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({
     setIsLoading(true);
     setError(null);
     try {
-      const balance = await getClubBalance(clubShortId);
+      const balance = await getClubBalance();
       setClubBalance(balance);
     } catch (err) {
       setError((err as Error).message || 'Не удалось загрузить баланс клуба');
@@ -172,5 +172,6 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({
     </div>
   );
 };
+
 
 

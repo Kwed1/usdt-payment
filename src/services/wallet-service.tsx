@@ -1,6 +1,6 @@
-import axios from "axios";
-import { useMemo } from "react";
-import { API_BASE_URL } from "../config/api.config";
+import axios from "axios"
+import { useMemo } from "react"
+import { API_BASE_URL } from "../config/api.config"
 
 export interface ITransactionResponse {
   address: string;
@@ -43,14 +43,29 @@ export interface ClubBalanceResponse {
 }
 
 export interface WithdrawRequest {
-  user_id: string;
+  tg_user_id: number;
   amount: number;
-  club_short_id: string;
 }
 
 export interface WithdrawResponse {
   success: boolean;
   message?: string;
+}
+
+export interface CreateTransactionRequest {
+  tg_user_id: number;
+  account_short_id: number;
+  club_short_id: number;
+  chips_amount: number;
+}
+
+export interface AuthRequest {
+  init_data: string;
+}
+
+export interface AuthResponse {
+  role: 'user' | 'admin';
+  club_id: number | null;
 }
 
 const apiClient = axios.create({
@@ -62,20 +77,27 @@ const apiClient = axios.create({
 
 export const useWalletService = () => {
   return useMemo(() => {
+    const auth = async (data: AuthRequest): Promise<AuthResponse> => {
+      console.log('wallet-service: Calling /auth with data:', { init_data: data.init_data ? 'present' : 'missing' })
+      const res = await apiClient.post<AuthResponse>('/auth', data)
+      console.log('wallet-service: /auth response:', res.data)
+      return res.data
+    }
+
     const createTransaction = async (
-      amount: number
+      data: CreateTransactionRequest
     ): Promise<ITransactionResponse> => {
-      const res = await apiClient.post<ITransactionResponse>('/create-deposit-message', { amount })
+      const res = await apiClient.post<ITransactionResponse>('/deposit-data', data)
       return res.data || { address: "", memo: "" }
     }
 
-    const generatePayload = async (): Promise<GeneratePayloadResponse> => {
-      const res = await apiClient.post<GeneratePayloadResponse>('/generate-payload')
+    const generatePayload = async (): Promise<string> => {
+      const res = await apiClient.post<string>('/generate-payload')
       return res.data
     }
 
     const connectWallet = async (data: ConnectWalletRequestBody): Promise<ConnectWalletResponse> => {
-      const res = await apiClient.post<ConnectWalletResponse>('/check-proof', data)
+      const res = await apiClient.post<ConnectWalletResponse>('/proof', data)
       return res.data
     }
 
@@ -83,8 +105,8 @@ export const useWalletService = () => {
       await apiClient.post('/wallet/disconnect')
     }
 
-    const getClubBalance = async (clubShortId: string): Promise<number> => {
-      const res = await apiClient.get<ClubBalanceResponse>(`/club/${clubShortId}/balance`)
+    const getClubBalance = async (): Promise<number> => {
+      const res = await apiClient.get<ClubBalanceResponse>(`/club-balance`)
       return res.data.balance || 0
     }
 
@@ -94,6 +116,7 @@ export const useWalletService = () => {
     }
 
     return { 
+      auth,
       createTransaction,
       generatePayload,
       connectWallet,

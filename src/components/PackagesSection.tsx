@@ -125,7 +125,6 @@ export const PackagesSection: React.FC<PackagesSectionProps> = ({
                   {formatNumber(amount, 0)}
                 </span>
                 <span className="price">
-                  <img src="https://ppnards.ams3.cdn.digitaloceanspaces.com/ppnards/leaderboards/type_params/tg_star.png" alt="USDT" className="xtr-icon" />
                   {formatNumber(price, 2)} USDT
                 </span>
               </div>

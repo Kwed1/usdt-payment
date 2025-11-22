@@ -1,17 +1,29 @@
 export interface ClubInfo {
+  id?: string;
   title?: string;
   short_id?: string | number;
   logo?: string;
+  balance_type?: string;
+  contacts?: Contact[];
+  union_title?: string;
 }
 
 export interface Contact {
+  channel?: string;
   label: string;
   value?: string;
   link?: string;
 }
 
+export interface Account {
+  id?: string;
+  short_id?: number;
+  nickname?: string;
+}
+
 export interface Sale {
   price_per_chip: number;
+  currency_code?: string;
   quick_packages: number[];
   allow_custom_amount: boolean;
   min_custom_amount?: number;
@@ -22,10 +34,11 @@ export interface Sale {
 
 export interface Preview {
   allowed: boolean;
-  reason?: string;
-  club?: ClubInfo;
-  sale?: Sale;
-  member_balance?: number;
+  reason?: string | null;
+  account?: Account | null;
+  club?: ClubInfo | null;
+  sale?: Sale | null;
+  member_balance?: number | null;
 }
 
 export interface OwnerClub {
