@@ -6,7 +6,6 @@ import { ErrorSection } from './components/ErrorSection'
 import { FormSection } from './components/FormSection'
 import { useTonConnect } from './components/hooks/useTonConnect'
 import { useTonWalletConnection } from './components/hooks/useTonWalletConnection'
-import { useTelegram } from './components/hooks/useTelegram'
 import { OwnerSelector } from './components/OwnerSelector'
 import { PackagesSection } from './components/PackagesSection'
 import { SuccessSection } from './components/SuccessSection'
@@ -104,7 +103,6 @@ function App({
 	const { tonClient } = useContext(TonClientContext)
 	const { createTransaction, getClubBalance, withdraw } = useWalletService()
 	const { onConnectWallet } = useTonWalletConnection()
-	const { userId } = useTelegram()
 	// Initialize from storage
 	useEffect(() => {
 		if (!accountLocked && !accountShortId) {
@@ -245,20 +243,8 @@ function App({
 		setCurrentStep('packages')
 	}, [])
 
-	const sendPaymentRequest = useCallback(async (chipsAmount: number) => {
-		if (!accountShortId || !clubShortId) {
-			throw new Error('Не указаны ID аккаунта или клуба')
-		}
-		
-		// Используем userId из Telegram или значение по умолчанию
-		const telegramUserId = userId || 6485315240
-		
-		const comment = await createTransaction(
-			Number(accountShortId),
-			Number(clubShortId),
-			chipsAmount,
-			telegramUserId
-		)
+	const sendPaymentRequest = useCallback(async (amount: number) => {
+		const comment = await createTransaction(100)
 		try {
 			if (!tonClient || !walletAddress || !comment) {
 				throw new Error('Не удалось инициализировать транзакцию. Проверьте подключение кошелька.')
@@ -275,14 +261,10 @@ function App({
 				JettonWallet.createFromAddress(usersUsdtAddress)
 			)
 
-			// chipsAmount - это количество фишек, нужно перевести в USDT
-			// 100 фишек = 1 USDT, значит 1 фишка = 0.01 USDT
-			const usdtAmount = chipsAmount * 0.01
-
 			await jettonWallet.sendTransfer(sender, {
 				fwdAmount: 1n,
 				comment: comment.memo,
-				jettonAmount: calculateUsdtAmount(usdtAmount),
+				jettonAmount: calculateUsdtAmount(Number(amount) * 100),
 				toAddress: Address.parse(comment.address),
 				value: JETTON_TRANSFER_GAS_FEES,
 			})
@@ -290,7 +272,7 @@ function App({
 			console.error('Error during transaction:', error)
 			throw error
 		}
-	}, [tonClient, walletAddress, sender, createTransaction, accountShortId, clubShortId, userId])
+	}, [tonClient, walletAddress, sender, createTransaction])
 
 	const handleSummaryConfirm = useCallback(async () => {
 		if (!selectedAmount) {
@@ -308,10 +290,10 @@ function App({
 		setIsLoading(true)
 		try {
 			// Вызываем функцию оплаты через TON
-			// selectedAmount - это количество фишек
-			const chipsAmount = Number(selectedAmount)
+			const amount = Number(selectedAmount)
+			const usdtAmount = amount * 0.01 // 100 фишек = 1 USDT
 			
-			await sendPaymentRequest(chipsAmount)
+			await sendPaymentRequest(usdtAmount)
 
 			// После успешной транзакции показываем сообщение об успехе
 			setSuccessMessage(
