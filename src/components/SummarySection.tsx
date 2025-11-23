@@ -45,9 +45,10 @@ export const SummarySection: React.FC<SummarySectionProps> = ({
   isLoading,
   isActive,
 }) => {
-  const amount = parseInt(selectedAmount || '0', 10);
-  const price = amount * pricePerChip;
-  const balanceAfter = memberBalance + amount;
+  // selectedAmount теперь в USDT, конвертируем обратно в фишки для отображения
+  const usdtAmount = parseFloat(selectedAmount || '0');
+  const chipsAmount = Math.round(usdtAmount / pricePerChip);
+  const balanceAfter = memberBalance + chipsAmount;
 
   return (
     <section id="step-summary" className={`section ${isActive ? 'active' : ''}`}>
@@ -82,7 +83,7 @@ export const SummarySection: React.FC<SummarySectionProps> = ({
               Фишек к зачислению
             </span>
             <span id="summary-chips" className="amount">
-              {formatNumber(amount, 0)}
+              {formatNumber(chipsAmount, 0)}
             </span>
           </div>
           <div className="summary-row">
@@ -95,7 +96,7 @@ export const SummarySection: React.FC<SummarySectionProps> = ({
               К оплате
             </span>
             <span id="summary-price" className="amount">
-              {formatNumber(price, 2)} USDT
+              {formatNumber(usdtAmount, 2)} USDT
             </span>
           </div>
           <div className="summary-row">

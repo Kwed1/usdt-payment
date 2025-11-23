@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react'
 interface WithdrawSectionProps {
   clubShortId: string;
   onWithdraw: (userId: string, amount: number) => Promise<void>;
-  getClubBalance: () => Promise<number>;
+  getClubBalance: (clubShortId: number) => Promise<number>;
   isActive: boolean;
   isLoading: boolean;
   onError: (message: string) => void;
@@ -31,10 +31,11 @@ export const WithdrawSection: React.FC<WithdrawSectionProps> = ({
   }, [isActive, clubShortId]);
 
   const loadClubBalance = async () => {
+    if (!clubShortId) return;
     setIsLoadingBalance(true);
     setError(null);
     try {
-      const balance = await getClubBalance();
+      const balance = await getClubBalance(Number(clubShortId));
       setClubBalance(balance);
     } catch (err) {
       setError((err as Error).message || 'Не удалось загрузить баланс клуба');
@@ -174,7 +175,7 @@ export const WithdrawSection: React.FC<WithdrawSectionProps> = ({
           )}
 
           <button type="submit" disabled={isLoading || isLoadingBalance}>
-            {isLoading ? 'Отправка...' : 'Send'}
+            {isLoading ? 'Отправка...' : 'Отправить'}
           </button>
         </form>
       </div>

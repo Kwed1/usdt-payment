@@ -9,6 +9,8 @@ interface PackagesSectionProps {
   isActive: boolean;
   walletConnected: boolean;
   onConnectWallet: () => Promise<void>;
+  isVerifyingProof?: boolean;
+  proofError?: string | null;
 }
 
 function formatNumber(value: number, fractionDigits = 0): string {
@@ -26,6 +28,8 @@ export const PackagesSection: React.FC<PackagesSectionProps> = ({
   isActive,
   walletConnected,
   onConnectWallet,
+  isVerifyingProof = false,
+  proofError = null,
 }) => {
   const [customAmount, setCustomAmount] = useState('');
   const [selectedPackage, setSelectedPackage] = useState<number | null>(null);
@@ -44,13 +48,17 @@ export const PackagesSection: React.FC<PackagesSectionProps> = ({
     }
   };
 
-  const handlePackageClick = (amount: number) => {
+  const handlePackageClick = (chipsAmount: number) => {
     if (!walletConnected) {
       handleConnectWallet();
       return;
     }
-    setSelectedPackage(amount);
-    onAmountSelect(String(amount));
+    // Конвертируем количество фишек в USDT с точностью до 2 знаков
+    const usdtAmount = chipsAmount * pricePerChip;
+    const preciseUsdtAmount = Math.round(usdtAmount * 100) / 100; // Округляем до 2 знаков
+    setSelectedPackage(chipsAmount);
+    console.log('Package selected - chips:', chipsAmount, 'USDT:', preciseUsdtAmount);
+    onAmountSelect(String(preciseUsdtAmount));
   };
 
   const handleCustomAmount = () => {
@@ -59,37 +67,20 @@ export const PackagesSection: React.FC<PackagesSectionProps> = ({
       return;
     }
 
-    const value = Number(customAmount);
-    if (!customAmount || isNaN(value) || value <= 0 || !Number.isInteger(value)) {
+    // Пользователь вводит сумму в USDT - используем именно то, что он ввел
+    const usdtValue = parseFloat(customAmount);
+    if (!customAmount || isNaN(usdtValue) || usdtValue <= 0) {
       return;
     }
 
-    let finalValue = value;
-
-    if (sale.min_custom_amount && value < Number(sale.min_custom_amount)) {
-      finalValue = Number(sale.min_custom_amount);
-      setCustomAmount(String(finalValue));
-      return;
-    }
-
-    if (sale.max_custom_amount && value > Number(sale.max_custom_amount)) {
-      finalValue = Number(sale.max_custom_amount);
-      setCustomAmount(String(finalValue));
-      return;
-    }
-
-    if (sale.custom_step) {
-      const base = sale.min_custom_amount ? Number(sale.min_custom_amount) : 0;
-      const step = Number(sale.custom_step);
-      if (step > 0 && ((value - base) % step !== 0)) {
-        finalValue = value - ((value - base) % step);
-        setCustomAmount(String(finalValue));
-        return;
-      }
-    }
-
+    // Используем точно то, что ввел пользователь - без корректировок
+    // Ограничения будут проверяться на бэкенде
+    const finalUsdt = usdtValue;
+    
+    console.log('handleCustomAmount - input USDT:', usdtValue, 'finalUsdt:', finalUsdt);
+    
     setSelectedPackage(null);
-    onAmountSelect(String(Math.round(finalValue)));
+    onAmountSelect(String(finalUsdt));
   };
 
   const customRangeParts: string[] = [];
@@ -113,7 +104,8 @@ export const PackagesSection: React.FC<PackagesSectionProps> = ({
         <div id="packages-list" className="packages">
           {sale.quick_packages.map((amountValue) => {
             const amount = Number(amountValue);
-            const price = amount * pricePerChip;
+            // Точная цена в USDT с округлением до 2 знаков
+            const price = Math.round(amount * pricePerChip * 100) / 100;
             return (
               <div
                 key={amount}
@@ -133,24 +125,50 @@ export const PackagesSection: React.FC<PackagesSectionProps> = ({
         </div>
         {sale.allow_custom_amount && (
           <div className="field" id="custom-amount-area" style={{ marginTop: '18px' }}>
-            <label htmlFor="custom-amount">Свой вариант</label>
+            <label htmlFor="custom-amount">Свой вариант (USDT)</label>
             <div className="custom-amount-wrapper">
               <input
                 id="custom-amount"
                 type="number"
-                min="1"
-                step="1"
-                placeholder="Например: 150"
+                min="0.01"
+                step="0.01"
+                placeholder="Например: 1.5"
                 value={customAmount}
                 onChange={(e) => setCustomAmount(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleCustomAmount();
+                  }
+                }}
+                disabled={isVerifyingProof}
               />
-              <button type="button" id="custom-amount-button" onClick={handleCustomAmount}>
-                {walletConnected ? 'Добавить' : 'Подключить кошелек'}
+              <button 
+                type="button" 
+                id="custom-amount-button" 
+                onClick={handleCustomAmount}
+                disabled={isVerifyingProof}
+              >
+                {isVerifyingProof 
+                  ? 'Проверка...' 
+                  : walletConnected 
+                    ? 'Добавить' 
+                    : 'Подключить кошелек'}
               </button>
             </div>
             {customRangeParts.length > 0 && (
               <p className="hint" id="custom-range-hint">
-                Допустимый диапазон: {customRangeParts.join(' ')}
+                Допустимый диапазон фишек: {customRangeParts.join(' ')}. Введите сумму в USDT.
+              </p>
+            )}
+            {isVerifyingProof && (
+              <p className="hint" style={{ color: 'var(--accent)', marginTop: '8px' }}>
+                Проверка кошелька...
+              </p>
+            )}
+            {proofError && (
+              <p className="hint" style={{ color: 'var(--error)', marginTop: '8px' }}>
+                {proofError}
               </p>
             )}
           </div>

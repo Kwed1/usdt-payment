@@ -13,9 +13,9 @@ import { SuccessSection } from './components/SuccessSection'
 import { SummarySection } from './components/SummarySection'
 import { WithdrawSection } from './components/WithdrawSection'
 import { getApiUrl } from './config/api.config'
+import { getAuthToken } from './services/wallet-service'
 import { USDT_MASTER_ADDRESS } from './constants/common-constants'
 import { JETTON_TRANSFER_GAS_FEES } from './constants/fees.constants'
-import { calculateUsdtAmount } from './helpers/common-helpers'
 import { init } from './init'
 import { useWalletService } from './services/wallet-service'
 import type {
@@ -103,8 +103,8 @@ function App({
 	const [ownerStatsLoading, setOwnerStatsLoading] = useState(false)
 	const { sender, walletAddress, connected } = useTonConnect()
 	const { tonClient } = useContext(TonClientContext)
-	const { auth, createTransaction, getClubBalance, withdraw } = useWalletService()
-	const { onConnectWallet } = useTonWalletConnection()
+	const { auth, createTransaction, getClubBalance, withdraw, getPreview } = useWalletService()
+	const { onConnectWallet, isConnecting, connectionError } = useTonWalletConnection()
 
 	useEffect(() => {
 		const performAuth = async () => {
@@ -157,24 +157,10 @@ function App({
 
 	const fetchPreview = useCallback(
 		async (account: string, club: string): Promise<Preview> => {
-			const query = new URLSearchParams({
-				account_short_id: String(account),
-				club_short_id: String(club),
-			})
-			const response = await fetch(
-				`${getApiUrl('preview')}?${query.toString()}`,
-				{
-					headers: {
-						Accept: 'application/json',
-					},
-				}
-			)
-			if (!response.ok) {
-				throw new Error('Не удалось получить данные. Попробуйте позже.')
-			}
-			return response.json()
+			const previewData = await getPreview(Number(account), Number(club))
+			return previewData
 		},
-		[]
+		[getPreview]
 	)
 
 	const handleFormSubmit = useCallback(
@@ -200,7 +186,7 @@ function App({
 					return
 				}
 
-				// Если allowed: true, продолжаем
+				// Если allowed: true, сохраняем данные
 				setAccountShortId(account)
 				setClubShortId(club)
 				setPreview(previewData)
@@ -208,7 +194,23 @@ function App({
 				setClubMessage(previewData.sale?.custom_message || '')
 
 				persistInputs()
-				setCurrentStep('packages')
+
+				// Проверяем подключение кошелька
+				if (!connected || !walletAddress) {
+					// Запрашиваем подключение кошелька
+					try {
+						await onConnectWallet()
+						// После подключения переходим к выбору пакетов
+						setCurrentStep('packages')
+					} catch (error) {
+						// Если пользователь отклонил подключение, все равно переходим к пакетам
+						// Пользователь сможет подключить кошелек позже
+						setCurrentStep('packages')
+					}
+				} else {
+					// Кошелек уже подключен, переходим к пакетам
+					setCurrentStep('packages')
+				}
 			} catch (error) {
 				setErrorMessage(
 					(error as Error).message || 'Не удалось получить данные.'
@@ -219,7 +221,7 @@ function App({
 				setIsLoading(false)
 			}
 		},
-		[accountShortId, clubShortId, clubLocked, authClubId, persistInputs, fetchPreview]
+		[accountShortId, clubShortId, clubLocked, authClubId, persistInputs, fetchPreview, connected, walletAddress, onConnectWallet]
 	)
 
 	const handleAmountSelect = useCallback((amount: string) => {
@@ -231,20 +233,31 @@ function App({
 		setCurrentStep('packages')
 	}, [])
 
-	const sendPaymentRequest = useCallback(async (amount: number) => {
-		if (!accountShortId || !clubShortId || !selectedAmount) {
+	const sendPaymentRequest = useCallback(async (usdtAmount: number) => {
+		if (!accountShortId || !clubShortId || !selectedAmount || !preview?.sale) {
 			throw new Error('Не указаны необходимые данные для транзакции')
 		}
 		
+		console.log('sendPaymentRequest - usdtAmount:', usdtAmount)
+		
+		// selectedAmount теперь в USDT, конвертируем обратно в фишки для бэкенда
+		const pricePerChip = Number(preview.sale.price_per_chip)
+		const chipsAmount = Math.round(usdtAmount / pricePerChip)
+		
+		console.log('Calculated chipsAmount:', chipsAmount, 'from USDT:', usdtAmount, 'pricePerChip:', pricePerChip)
+		
+		if (chipsAmount <= 0) {
+			throw new Error('Сумма слишком мала')
+		}
+		
 		const comment = await createTransaction({
-			tg_user_id: 0, // Можно получить из authData или другого источника
 			account_short_id: Number(accountShortId),
 			club_short_id: Number(clubShortId),
-			chips_amount: Number(selectedAmount),
+			chips_amount: chipsAmount,
 		})
 		
 		try {
-			if (!tonClient || !walletAddress || !comment) {
+			if (!tonClient || !walletAddress || !comment || !comment.address || !comment.memo) {
 				throw new Error('Не удалось инициализировать транзакцию. Проверьте подключение кошелька.')
 			}
 
@@ -259,18 +272,26 @@ function App({
 				JettonWallet.createFromAddress(usersUsdtAddress)
 			)
 
+			// USDT имеет 6 знаков после запятой, поэтому умножаем на 1,000,000
+			// usdtAmount уже в USDT (например, 30 USDT)
+			const nanoUsdtAmount = BigInt(Math.round(usdtAmount * 1000000))
+			
+			console.log('Sending transaction - USDT amount:', usdtAmount, 'nanoUSDT:', nanoUsdtAmount.toString())
+
 			await jettonWallet.sendTransfer(sender, {
 				fwdAmount: 1n,
 				comment: comment.memo,
-				jettonAmount: calculateUsdtAmount(Number(amount) * 100),
+				jettonAmount: nanoUsdtAmount,
 				toAddress: Address.parse(comment.address),
 				value: JETTON_TRANSFER_GAS_FEES,
 			})
+			
+			console.log('Transaction sent successfully')
 		} catch (error) {
 			console.error('Error during transaction:', error)
 			throw error
 		}
-	}, [tonClient, walletAddress, sender, createTransaction, accountShortId, clubShortId, selectedAmount])
+	}, [tonClient, walletAddress, sender, createTransaction, accountShortId, clubShortId, selectedAmount, preview])
 
 	const handleSummaryConfirm = useCallback(async () => {
 		if (!selectedAmount) {
@@ -287,9 +308,14 @@ function App({
 
 		setIsLoading(true)
 		try {
-			// Вызываем функцию оплаты через TON
-			const amount = Number(selectedAmount)
-			const usdtAmount = amount * 0.01 // 100 фишек = 1 USDT
+			// selectedAmount теперь уже в USDT
+			const usdtAmount = parseFloat(selectedAmount)
+			
+			console.log('Payment request - selectedAmount:', selectedAmount, 'usdtAmount:', usdtAmount)
+			
+			if (usdtAmount <= 0 || isNaN(usdtAmount)) {
+				throw new Error('Некорректная сумма для оплаты')
+			}
 			
 			await sendPaymentRequest(usdtAmount)
 
@@ -299,9 +325,22 @@ function App({
 			)
 			setCurrentStep('success')
 		} catch (error) {
-			setErrorMessage(
-				(error as Error).message || 'Не удалось выполнить оплату.'
-			)
+			// Проверяем, отклонил ли пользователь транзакцию в кошельке
+			const errorMessage = (error as Error).message || ''
+			const errorString = errorMessage.toLowerCase()
+			
+			if (
+				errorString.includes('wallet declined') ||
+				errorString.includes('badrequesterror') ||
+				errorString.includes('request to the wallet contains errors') ||
+				errorString.includes('ton_connect_sdk_error') ||
+				errorString.includes('user rejected') ||
+				errorString.includes('user cancelled')
+			) {
+				setErrorMessage('Пользователь отклонил платеж')
+			} else {
+				setErrorMessage(errorMessage || 'Не удалось выполнить оплату.')
+			}
 			setErrorContacts([])
 			setCurrentStep('error')
 		} finally {
@@ -324,12 +363,17 @@ function App({
 		}
 
 		try {
+			const token = getAuthToken()
+			const headers: Record<string, string> = {
+				'Content-Type': 'application/json',
+				Accept: 'application/json',
+			}
+			if (token) {
+				headers['Authorization'] = `Bearer ${token}`
+			}
 			const response = await fetch(getApiUrl('tg-club-chip-sales/owner-clubs'), {
 				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					Accept: 'application/json',
-				},
+				headers,
 				body: JSON.stringify({
 					authData: authData,
 				}),
@@ -384,12 +428,17 @@ function App({
 			setOwnerStats(null)
 
 			try {
+				const token = getAuthToken()
+				const headers: Record<string, string> = {
+					'Content-Type': 'application/json',
+					Accept: 'application/json',
+				}
+				if (token) {
+					headers['Authorization'] = `Bearer ${token}`
+				}
 				const response = await fetch(getApiUrl('tg-club-chip-sales/owner-insights'), {
 					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json',
-						Accept: 'application/json',
-					},
+					headers,
 					body: JSON.stringify({
 						authData: authData,
 						club_short_id: Number(clubShortId),
@@ -446,14 +495,15 @@ function App({
 	}, [authData, loadOwnerClubs])
 
 	const handleWithdraw = useCallback(async (userId: string, amount: number) => {
-		const userIdNum = Number(userId)
-		if (isNaN(userIdNum) || userIdNum <= 0) {
-			throw new Error('Некорректный User ID')
+		// tg_user_id берется из токена на бэкенде
+		// userId здесь не используется, но оставляем для совместимости с интерфейсом
+		const amountNum = Number(amount)
+		if (isNaN(amountNum) || amountNum <= 0) {
+			throw new Error('Некорректная сумма')
 		}
 		
 		const response = await withdraw({
-			tg_user_id: userIdNum,
-			amount: amount,
+			amount: amountNum,
 		})
 
 		if (!response.success) {
@@ -525,7 +575,7 @@ function App({
 					isActive={currentStep === 'form'}
 				/>
 
-				{isAdmin && preview && preview.allowed && (
+				{isAdmin && (
 					<div style={{ 
 						marginTop: '20px', 
 						marginBottom: '20px',
@@ -533,51 +583,6 @@ function App({
 						gap: '12px',
 						justifyContent: 'center'
 					}}>
-						<button
-							type="button"
-							onClick={() => setCurrentStep('packages')}
-							style={{
-								padding: '14px 28px',
-								background: currentStep === 'packages' || currentStep === 'summary' 
-									? 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)'
-									: 'linear-gradient(135deg, #2196F3 0%, #1976D2 100%)',
-								color: 'white',
-								border: 'none',
-								borderRadius: '12px',
-								cursor: 'pointer',
-								fontSize: '1rem',
-								fontWeight: '600',
-								boxShadow: currentStep === 'packages' || currentStep === 'summary'
-									? '0 4px 15px rgba(76, 175, 80, 0.4), 0 2px 8px rgba(76, 175, 80, 0.2)'
-									: '0 4px 15px rgba(33, 150, 243, 0.3), 0 2px 8px rgba(33, 150, 243, 0.2)',
-								transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-								transform: 'translateY(0)',
-								position: 'relative',
-								overflow: 'hidden',
-							}}
-							onMouseEnter={(e) => {
-								if (currentStep !== 'packages' && currentStep !== 'summary') {
-									e.currentTarget.style.transform = 'translateY(-2px)'
-									e.currentTarget.style.boxShadow = '0 6px 20px rgba(33, 150, 243, 0.4), 0 4px 12px rgba(33, 150, 243, 0.3)'
-								}
-							}}
-							onMouseLeave={(e) => {
-								if (currentStep !== 'packages' && currentStep !== 'summary') {
-									e.currentTarget.style.transform = 'translateY(0)'
-									e.currentTarget.style.boxShadow = '0 4px 15px rgba(33, 150, 243, 0.3), 0 2px 8px rgba(33, 150, 243, 0.2)'
-								}
-							}}
-							onMouseDown={(e) => {
-								e.currentTarget.style.transform = 'translateY(0) scale(0.98)'
-							}}
-							onMouseUp={(e) => {
-								e.currentTarget.style.transform = currentStep === 'packages' || currentStep === 'summary' 
-									? 'translateY(0)' 
-									: 'translateY(-2px)'
-							}}
-						>
-							💳 Депозит
-						</button>
 						<button
 							type="button"
 							onClick={() => setCurrentStep('withdraw')}
@@ -626,6 +631,7 @@ function App({
 					</div>
 				)}
 
+
 				<ErrorSection
 					message={errorMessage}
 					contacts={errorContacts}
@@ -641,6 +647,8 @@ function App({
 					isActive={currentStep === 'packages'}
 					walletConnected={connected}
 					onConnectWallet={onConnectWallet}
+					isVerifyingProof={isConnecting}
+					proofError={connectionError}
 				/>
 
 				{preview?.sale && (
@@ -666,7 +674,7 @@ function App({
 
 				{isAdmin && (
 					<WithdrawSection
-						clubShortId={clubShortId || ''}
+						clubShortId={authClubId !== null ? String(authClubId) : (clubShortId || '')}
 						onWithdraw={handleWithdraw}
 						getClubBalance={getClubBalance}
 						isActive={currentStep === 'withdraw'}

@@ -18,13 +18,13 @@ export const useTonWalletConnection = () => {
 			setConnectionError(null)
 			tonConnectUI.setConnectRequestParameters({ state: 'loading' })
 
-			const response = await generatePayload()
-
-			if (response) {
+			const payload = await generatePayload()
+			
+			if (payload) {
 				tonConnectUI.setConnectRequestParameters({
 					state: 'ready',
 					value: {
-						tonProof: response,
+						tonProof: payload,
 					},
 				})
 				tonConnectUI.openModal()
@@ -76,22 +76,57 @@ export const useTonWalletConnection = () => {
 
 				try {
 					const account = wallet.account
+					const tonProof = wallet.connectItems.tonProof.proof
+					
+					// Формируем правильную структуру proof для бэкенда
+					// TonConnect возвращает domain как объект или строку, нужно правильно обработать
+					let domainValue = ''
+					let domainLengthBytes = 0
+					
+					if (tonProof.domain) {
+						if (typeof tonProof.domain === 'string') {
+							domainValue = tonProof.domain
+							domainLengthBytes = new TextEncoder().encode(tonProof.domain).length
+						} else if (typeof tonProof.domain === 'object') {
+							domainValue = tonProof.domain.value || ''
+							domainLengthBytes = tonProof.domain.lengthBytes || new TextEncoder().encode(domainValue).length
+						}
+					}
+					
 					const reqBody: ConnectWalletRequestBody = {
 						address: account.address,
 						public_key: account.publicKey,
-						proof: wallet.connectItems.tonProof.proof,
+						proof: {
+							timestamp: tonProof.timestamp,
+							domain: {
+								lengthBytes: domainLengthBytes,
+								value: domainValue,
+							},
+							signature: tonProof.signature,
+							payload: tonProof.payload,
+						},
 					}
 
+					console.log('Verifying wallet proof...', {
+						address: reqBody.address,
+						hasPublicKey: !!reqBody.public_key,
+						hasProof: !!reqBody.proof,
+						proofPayload: reqBody.proof.payload.substring(0, 20) + '...'
+					})
+					
 					const response = await connectWallet(reqBody)
 
-					if (response?.success !== true) {
-						await onDisconnectWallet()
-						setConnectionError('Не удалось подтвердить подключение кошелька')
+					if (!response?.valid) {
+						throw new Error('Проверка proof не прошла')
 					}
+
+					console.log('✅ Wallet proof verified successfully, address:', response.address)
 				} catch (error) {
-					console.error('Error connecting wallet:', error)
+					console.error('Error verifying wallet proof:', error)
 					await onDisconnectWallet()
-					setConnectionError((error as Error).message || 'Ошибка при подключении кошелька')
+					const errorMessage = (error as Error).message || 'Ошибка при проверке кошелька'
+					setConnectionError(errorMessage)
+					throw error // Пробрасываем ошибку дальше для обработки
 				} finally {
 					setIsConnecting(false)
 				}
