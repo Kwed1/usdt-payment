@@ -542,11 +542,6 @@ function App({
 	return (
 		<div className='app'>
 			<header>
-				<h1>Покупка фишек</h1>
-				<p>
-					Введите свой ID игрока и ID клуба, чтобы пополнить баланс фишек за
-					USDT.
-				</p>
 			</header>
 			<main>
 				{authData && (
@@ -575,61 +570,6 @@ function App({
 					isActive={currentStep === 'form'}
 				/>
 
-				{isAdmin && (
-					<div style={{ 
-						marginTop: '20px', 
-						marginBottom: '20px',
-						display: 'flex', 
-						gap: '12px',
-						justifyContent: 'center'
-					}}>
-						<button
-							type="button"
-							onClick={() => setCurrentStep('withdraw')}
-							style={{
-								padding: '14px 28px',
-								background: currentStep === 'withdraw'
-									? 'linear-gradient(135deg, #F57C00 0%, #E65100 100%)'
-									: 'linear-gradient(135deg, #FF9800 0%, #F57C00 100%)',
-								color: 'white',
-								border: 'none',
-								borderRadius: '12px',
-								cursor: 'pointer',
-								fontSize: '1rem',
-								fontWeight: '600',
-								boxShadow: currentStep === 'withdraw'
-									? '0 4px 15px rgba(245, 124, 0, 0.4), 0 2px 8px rgba(245, 124, 0, 0.2)'
-									: '0 4px 15px rgba(255, 152, 0, 0.3), 0 2px 8px rgba(255, 152, 0, 0.2)',
-								transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-								transform: 'translateY(0)',
-								position: 'relative',
-								overflow: 'hidden',
-							}}
-							onMouseEnter={(e) => {
-								if (currentStep !== 'withdraw') {
-									e.currentTarget.style.transform = 'translateY(-2px)'
-									e.currentTarget.style.boxShadow = '0 6px 20px rgba(255, 152, 0, 0.4), 0 4px 12px rgba(255, 152, 0, 0.3)'
-								}
-							}}
-							onMouseLeave={(e) => {
-								if (currentStep !== 'withdraw') {
-									e.currentTarget.style.transform = 'translateY(0)'
-									e.currentTarget.style.boxShadow = '0 4px 15px rgba(255, 152, 0, 0.3), 0 2px 8px rgba(255, 152, 0, 0.2)'
-								}
-							}}
-							onMouseDown={(e) => {
-								e.currentTarget.style.transform = 'translateY(0) scale(0.98)'
-							}}
-							onMouseUp={(e) => {
-								e.currentTarget.style.transform = currentStep === 'withdraw' 
-									? 'translateY(0)' 
-									: 'translateY(-2px)'
-							}}
-						>
-							💰 Вывод
-						</button>
-					</div>
-				)}
 
 
 				<ErrorSection

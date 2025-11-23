@@ -97,7 +97,6 @@ export const PackagesSection: React.FC<PackagesSectionProps> = ({
   return (
     <section id="step-packages" className={`section ${isActive ? 'active' : ''}`}>
       <div className="card">
-        <h2>Выберите количество фишек</h2>
         {clubMessage && (
           <div className="club-message">{clubMessage}</div>
         )}

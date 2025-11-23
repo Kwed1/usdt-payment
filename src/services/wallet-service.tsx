@@ -145,8 +145,14 @@ export const useWalletService = () => {
         console.log('Sending proof to backend:', { address: data.address, hasProof: !!data.proof })
         const res = await apiClient.post<ConnectWalletResponse>('/proof', data)
         console.log('Proof verification response:', res.data)
+        
+        // Проверяем статус ответа
+        if (res.status !== 200) {
+          throw new Error('Кошелек не привязался')
+        }
+        
         if (!res.data.valid) {
-          throw new Error('Proof verification failed')
+          throw new Error('Кошелек не привязался')
         }
         return res.data
       } catch (error) {
@@ -154,7 +160,11 @@ export const useWalletService = () => {
         if (axios.isAxiosError(error)) {
           console.error('Response status:', error.response?.status)
           console.error('Response data:', error.response?.data)
-          throw new Error(error.response?.data?.message || 'Ошибка при проверке proof кошелька')
+          // Если статус не 200, выбрасываем ошибку с сообщением о том, что кошелек не привязался
+          if (error.response && error.response.status !== 200) {
+            throw new Error('Кошелек не привязался')
+          }
+          throw new Error(error.response?.data?.message || 'Кошелек не привязался')
         }
         throw error
       }

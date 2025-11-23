@@ -117,15 +117,16 @@ export const useTonWalletConnection = () => {
 					const response = await connectWallet(reqBody)
 
 					if (!response?.valid) {
-						throw new Error('Проверка proof не прошла')
+						throw new Error('Кошелек не привязался')
 					}
 
 					console.log('✅ Wallet proof verified successfully, address:', response.address)
 				} catch (error) {
 					console.error('Error verifying wallet proof:', error)
+					// Отвязываем кошелек при любой ошибке
 					await onDisconnectWallet()
-					const errorMessage = (error as Error).message || 'Ошибка при проверке кошелька'
-					setConnectionError(errorMessage)
+					// Устанавливаем сообщение об ошибке
+					setConnectionError('Кошелек не привязался')
 					throw error // Пробрасываем ошибку дальше для обработки
 				} finally {
 					setIsConnecting(false)
