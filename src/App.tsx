@@ -538,6 +538,11 @@ function App({
 	return (
 		<div className='app'>
 			<header>
+				<h1>Покупка фишек</h1>
+				<p>
+					Введите свой ID игрока и ID клуба, чтобы пополнить баланс фишек за
+					USDT.
+				</p>
 			</header>
 			<main>
 				{authData && (
