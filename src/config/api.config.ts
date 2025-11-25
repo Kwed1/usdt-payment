@@ -1,5 +1,12 @@
+const getApiBaseUrl = (): string => {
+  if (typeof window !== 'undefined' && window._env_?.VITE_API_URL) {
+    return window._env_.VITE_API_URL
+  }
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/tg-club-chip-sales-ton/'
+  return import.meta.env.VITE_API_URL
+}
+
+export const API_BASE_URL = getApiBaseUrl()
 
 export const getApiUrl = (path: string): string => {
   const cleanPath = path.startsWith('/') ? path.slice(1) : path

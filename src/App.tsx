@@ -13,11 +13,10 @@ import { SuccessSection } from './components/SuccessSection'
 import { SummarySection } from './components/SummarySection'
 import { WithdrawSection } from './components/WithdrawSection'
 import { getApiUrl } from './config/api.config'
-import { getAuthToken } from './services/wallet-service'
 import { USDT_MASTER_ADDRESS } from './constants/common-constants'
 import { JETTON_TRANSFER_GAS_FEES } from './constants/fees.constants'
 import { init } from './init'
-import { useWalletService } from './services/wallet-service'
+import { getAuthToken, useWalletService } from './services/wallet-service'
 import type {
 	ClubInfo,
 	Contact,
@@ -84,9 +83,8 @@ function App({
 	const [isLoading, setIsLoading] = useState(false)
 	const [successMessage, setSuccessMessage] = useState('')
 
-	// Owner selector state
 	const [ownerClubs, setOwnerClubs] = useState<OwnerClub[]>([])
-	const [ownerClubsByShortId, setOwnerClubsByShortId] = useState<
+	const [, setOwnerClubsByShortId] = useState<
 		Record<string, OwnerClub>
 	>({})
 	const [ownerClubsLoaded, setOwnerClubsLoaded] = useState(false)
@@ -494,9 +492,7 @@ function App({
 		}
 	}, [authData, loadOwnerClubs])
 
-	const handleWithdraw = useCallback(async (userId: string, amount: number) => {
-		// tg_user_id берется из токена на бэкенде
-		// userId здесь не используется, но оставляем для совместимости с интерфейсом
+	const handleWithdraw = useCallback(async (_userId: string, amount: number) => {
 		const amountNum = Number(amount)
 		if (isNaN(amountNum) || amountNum <= 0) {
 			throw new Error('Некорректная сумма')
